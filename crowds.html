@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <style>
+        body {
+            margin: 0px;
+        }
+
+        .bar {
+            fill: white;
+            opacity: 0;
+            stroke: white;
+            stroke-width: 1px;
+        }
+
+        .axis {
+            font: 10px sans-serif;
+        }
+
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: #000;
+            stroke-width: 0;
+            shape-rendering: crispEdges;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script>
+
+        // set the dimensions of the canvas
+        var margin = {
+            top: 20,
+            right: 100,
+            bottom: 0,
+            left: 10
+        },
+            width = 1200 - margin.left - margin.right,
+            height = 670 - margin.top - margin.bottom;
+
+        // set the ranges, also sets the width of bars
+        var x = d3.scale.ordinal().rangeRoundBands([0, width], .3);
+        var y = d3.scale.linear().range([height, 0]);
+
+        // define the axis
+        var xAxis = d3.svg.axis()
+            .scale(x)
+            .orient("bottom")
+
+        var yAxis = d3.svg.axis()
+            .scale(y)
+            .orient("left")
+            .ticks(5);
+
+        // add the SVG element
+        var svg = d3.select("body").append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform",
+                "translate(" + margin.left + "," + margin.top + ")");
+
+        d3.xml("crowdssteamgraph-fit-reflected.svg", function (error, documentFragment) {
+            if (error) {
+                console.log(error);
+                return;
+            }
+
+            var svgNode = documentFragment
+                .getElementsByTagName("svg")[0];
+
+            svg.node().appendChild(svgNode);
+            //.attr("height", height/2)
+            //.attr("width", "1200px")
+            //.attr("y", 0),attr("x", 0);
+
+            var innerSVG = svg.select("svg").attr("height", "650")
+                .attr("width", function () {
+                    return 1067;
+                });
+        });
+
+        var tooltip = []
+        // load the data
+        d3.json("crowd.json", function (error, data) {
+            // scale the range of the data
+            var max_crowd = 0
+            data.forEach(function (d) {
+                if (max_crowd < parseInt(d.Crowd)) {
+                    max_crowd = parseInt(d.Crowd);
+                }
+            });
+
+            x.domain(data.map(function (d) {
+                return d.Date;
+            }));
+            y.domain([0, d3.max(data, function (d) {
+                return d.Amount;
+            })]);
+
+            // add axis
+
+            svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", "translate(0," + height + ")")
+                .call(xAxis)
+                .selectAll("text")
+                .style("text-anchor", "end")
+                .attr("dx", "-.8em")
+                .attr("dy", "-.55em")
+                .attr("transform", "rotate(-90)");
+
+            svg.append("g")
+                .attr("class", "y axis")
+                .call(yAxis)
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("x", 5)
+                .attr("y", 5)
+                .attr("dy", ".71em")
+                .style("text-anchor", "end")
+                //.text("Money Contributed")
+                ;
+
+            var dummy = 0;
+
+            svg.selectAll("bar")
+                .data(data)
+                .enter().append("rect")
+                .attr("class", "bar")
+                .style("cursor", "pointer")
+                .attr("x", function (d) {
+                    dummy = dummy + 1;
+                    return (dummy - 1.5) * (width / data.length);
+                })
+                .attr("width", (width / data.length))
+                .attr("y", function (d) {
+                    return 0;
+                })
+                .attr("height", function (d) {
+                    return height / 2;
+                })
+                .on("mouseover", function (d) {
+                    $((("#amount" + String(d.Date) + String(d.Place) + String(d.Notes) + String(d.Crowd)).split(' ').join('')).replace("'", "").replace(",", "")).css("visibility", "visible")
+                        ;
+                })
+                .on("mouseout", function (d) {
+                    $((("#amount" + String(d.Date) + String(d.Place) + String(d.Notes) + String(d.Crowd)).split(' ').join('')).replace("'", "").replace(",", "")).css("visibility", "hidden");
+                });
+
+
+            var dummy = 0;
+            // tooltips
+
+            for (var i = 0; i < data.length; i++) {
+                tooltip.push(
+                    svg.append("g").attr("id", (("amount" + String(data[i].Date) + String(data[i].Place) + String(data[i].Notes) + String(data[i].Crowd)).split(' ').join('')).replace("'", "").replace(",", ""))
+                        .style("visibility", "hidden")
+                );
+
+                dummy = dummy + 1;
+                tooltip[tooltip.length - 1].append("line")
+                    .attr("x1", function () {
+                        return (dummy - 1) * (width / data.length);
+                    })
+                    .attr("y1", function () {
+                        return height / 6;
+                    })
+                    .attr("x2", function () {
+                        return (dummy - 1) * (width / data.length);
+                    })
+                    .attr("y2", function () {
+                        return height / 2;
+                    })
+                    .style("stroke", "#FBB03B") // colour the line
+                    .style("stroke-width", 2);
+
+                var string = '';
+                if (data[i].Date) {
+                    string = string + data[i].Date;
+                }
+                if (data[i].Place) {
+                    string = string + ", " + data[i].Place + '<br />';
+                }
+                if (data[i].Notes) {
+                    string = string + data[i].Notes + '<br />';
+                }
+                if (data[i].Crowd) {
+                    string = string + "<span style='color: #FBB03B;'> Crowd: </span>" + data[i].Crowd + '<br />';
+                }
+                if (data[i].Muslims) {
+                    string = string + "<span style='color: #00C80E;'> Muslim Audience: </span>" + data[i].Muslims + '<br />';
+                }
+                if (data[i].Women) {
+                    string = string + "<span style='color: red;'> Women: </span>" + data[i].Women + '<br />';
+                }
+                if (data[i].Population) {
+                    string = string + "<span style='color: #A8A8A8;'> Population: </span>" + data[i].Population + '<br />';
+                }
+
+                tooltip[tooltip.length - 1].append("foreignObject")
+                    .attr("x", function () {
+                        return (dummy - 1) * (width / data.length) + 10;
+                    })
+                    .attr("y", function () {
+                        return height / 6 - 10;
+
+                    })
+                    .attr("width", 250)
+                    .attr("height", 400)
+                    .append("xhtml:body")
+                    .style("font", "16px 'Georgia'")
+                    .style("font-weight", "normal")
+                    .html(function () {
+                        return string;
+                    })
+                    ;
+
+                tooltip[tooltip.length - 1].append("circle")
+                    .attr("cx", function () {
+                        return (dummy - 1) * (width / data.length);
+                    })
+                    .attr("cy", function () {
+                        return height / 6;
+                    })
+                    .attr("r", 4)
+                    .style("fill", "#FBB03B");
+
+                svg.append("line")
+                    .attr("x1", function () {
+                        return (dummy - 1) * (width / data.length);
+                    })
+                    .attr("y1", function () {
+                        return 0;
+                    })
+                    .attr("x2", function () {
+                        return (dummy - 1) * (width / data.length);
+                    })
+                    .attr("y2", function () {
+                        return height / 2;
+                    })
+                    .style("stroke", "#FBB03B") // colour the line
+                    .style("stroke-width", 2)
+                    .style("opacity", 0.5);
+
+                if (i == 2 || i == 5 || i == 16 || i == 19 || i == 34 || i == 40) {
+                    var string = '';
+                    if (data[i].Date) {
+                        string = string + data[i].Date;
+                    }
+                    if (data[i].Place) {
+                        string = "<span style='color:#00C80E;'>" + string + ", " + data[i].Place + "</span>" + '<br />';
+                    }
+                    if (data[i].Text) {
+                        string = string + data[i].Text + '<br />';
+                    }
+
+                    var h = 0;
+
+                    if (i == 5) {
+                        h = 2.4 * height / 4;
+                    }
+                    else if (i == 16) {
+                        h = 3.4 * height / 4;
+                    }
+                    else if (i == 19) {
+                        h = 2.4 * height / 4;
+                    }
+                    else if (i == 34) {
+                        h = 3.2 * height / 4;
+                    }
+                    else if (i == 40) {
+                        h = 2.4 * height / 4;
+                    }
+                    else {
+                        h = 3 * height / 4;
+                    }
+                    svg.append("line")
+                        .attr("x1", function () {
+                            return (dummy - 1) * (width / data.length);
+                        })
+                        .attr("y1", function () {
+                            return h;
+                        })
+                        .attr("x2", function () {
+                            return (dummy - 1) * (width / data.length);
+                        })
+                        .attr("y2", function () {
+                            return height / 2;
+                        })
+                        .style("stroke", "#ccc") // colour the line
+                        .style("stroke-width", 1.5)
+                        .style("opacity", 1);
+
+                    svg.append("circle")
+                        .attr("cx", function () {
+                            return (dummy - 1) * (width / data.length);
+                        })
+                        .attr("cy", function () {
+                            return h;
+                        })
+                        .attr("r", 4)
+                        .style("fill", "#ccc");
+
+                    svg.append("foreignObject")
+                        .attr("x", function () {
+                            return (dummy - 1) * (width / data.length) + 10;
+                        })
+                        .attr("y", function () {
+                            return h - 10;
+                        })
+                        .attr("width", 250)
+                        .attr("height", 400)
+                        .append("xhtml:body")
+                        .style("font", "16px 'Georgia'")
+                        .style("font-weight", "normal")
+                        .html(function () {
+                            return "<span style='color: #ccc;'>Day " + data[i].Day + "</span><br />" + string;
+                        })
+                        ;
+                }
+            }
+        });
+
+    </script>
+
+</body>

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<head>
+  <!-- Latest compiled and minified CSS-->
+
+  <!-- jQuery library-->
+  <script src="https://d3js.org/d3.v3.min.js"></script>
+  <script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
+  <!-- Latest compiled JavaScript-->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+  <!-- jQuery library -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <!-- Latest compiled JavaScript -->
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
+  <style>
+    body {
+      font-family: Georgia, serif;
+      font-size: 16px;
+      line-height: inherit;
+    }
+
+    .chart {
+      fill: #CCC;
+    }
+
+    .line {
+      stroke: #505050;
+      stroke-width: 3;
+    }
+
+    .d3-tip {
+      line-height: 1;
+      font-weight: normal;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #fff;
+      border-radius: 2px;
+    }
+
+    /* Creates a small triangle extender for the tooltip */
+    .d3-tip:after {
+      box-sizing: border-box;
+      display: inline;
+      font-size: 5px;
+      width: 200px;
+      line-height: 1;
+      color: rgba(255, 255, 255, 0.8);
+      content: "\25BC";
+      position: absolute;
+      text-align: center;
+    }
+
+    /* Style northward tooltips differently */
+    .d3-tip.n:after {
+      font-size: 5px;
+      margin: -3px 0 0 0;
+      top: 100%;
+      left: 0;
+    }
+
+    .text-words {
+      border-radius: 4px;
+      background-color: #FFB660;
+      border: none;
+      color: white;
+      padding: 5px 10px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      margin: 10px auto;
+    }
+
+    hr {
+      /*max-width: 75rem;*/
+      height: 20px;
+      border: 0px;
+      border-right: 0;
+      border-top: 0;
+
+      margin-bottom: 20px;
+      clear: both;
+      width: 98%;
+    }
+
+    .clear {
+      border: none;
+      height: 0px;
+      border-bottom: 0px;
+    }
+
+    .space {
+      border: none;
+      height: 40px;
+      border-bottom: 0px;
+      border: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container" style="margin-top: 20px;">
+    <div class="">
+      <div class="container">
+        <div class="post-preview">
+
+          <button class="text-words" id="Antyaja">Antyaja</button>
+          <button class="text-words" id="British">British</button>
+          <button class="text-words" id="Faith">Faith</button>
+          <button class="text-words" id="God">God</button>
+          <button class="text-words" id="Government">Government</button>
+          <button class="text-words" id="Independence">Independence</button>
+          <button class="text-words" id="Khadi">Khadi</button>
+          <button class="text-words" id="Poor">Poor</button>
+          <button class="text-words" id="Salt">Salt</button>
+          <button class="text-words" id="Sister">Sister</button>
+          <button class="text-words" id="Struggle">Struggle</button>
+          <button class="text-words" id="Swaraj">Swaraj</button>
+          <button class="text-words" id="Tax">Tax</button>
+          <button class="text-words" id="Unity">Unity</button>
+          <button class="text-words" id="Volunteer">Volunteer</button>
+          <button class="text-words" id="Women">Women</button>
+
+        </div>
+        <hr class="space">
+      </div>
+    </div>
+  </div>
+
+  <script>
+
+    // #83C5B7
+    // #DF514D
+    // #DB403B
+    // #C6D5CE
+    // #FDF200
+    // #EA4C6F
+    // #9BD7D5
+    // #129792
+    // #505050
+
+    ($(document).ready(function () {
+
+      var chart_data = [];
+      var max_length = 0;
+
+      var words = ["Salt", "Independence", "Independent", "Struggle", "Faith", "Unity", "Unite", "Swaraj", "Tax", "Khadi", "Disobedience", "God", "Resign", "Volunteer",
+        "Women", "Woman", "Sister", "Government", "British", "Poor", "Antyaja"
+      ];
+
+      var words_color = ["#8bc34a", "#8e24aa", "#ba68c8", "#f44336", "#fb8c00", "#607d8b", "#78909c", "#6a1b9a", "#4caf50", "#795548", "#d32f2f", "#ff6f00", "#1e88e5", "#29b6f6",
+        "#d81b60", "#e91e63", "#f06292", "#303f9f", "#7e57c2", "#333300", "#333333"];
+
+      var words_sum = {};
+      var word_active = {};
+
+      for (var i = 0; i < words.length; i++) {
+        words_sum[words[i]] = 0;
+        word_active[words[i]] = false;
+      }
+
+      $.getJSON("speech.json", function (data) {
+        data.forEach(function (d) {
+          chart_data.push(d);
+          if (max_length < d["length"]) {
+            max_length = d["length"];
+          }
+          for (var i = 0; i < words.length; i++) {
+            words_sum[words[i]] = words_sum[words[i]] + d[words[i]].length;
+          }
+          //console.log(d);
+        });
+        start();
+      });
+
+      function start() {
+        ////////
+        var margin = {
+          top: 40,
+          right: 25,
+          bottom: 0,
+          left: 25
+        },
+          width = 1250 - margin.left - margin.right,
+          height = 800 - margin.top - margin.bottom;
+
+        var chart_dimension = {
+          width: 40,
+          height: 200,
+          left: 0,
+          top: 0,
+          color: "#C6D5CE"
+        };
+
+        var y = function (length, d) {
+          return (length / d['length']) * (d['length'] * chart_dimension.height / max_length);
+        }
+
+        var chart_length = function (d) {
+          return d['length'] * chart_dimension.height / max_length;
+        }
+
+        var svg = d3.select("body")
+          .append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+          .attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")")
+          .style("text-align", "auto")
+          ;
+
+        var tip = d3.tip()
+          .attr('class', 'd3-tip')
+          .offset([-10, 0])
+          .html(function (word, d) {
+            //console.log();
+            return "<span style='color:#6E6E6E; font-weight:regular;'>" + d["name"] + "</span> <br/>"
+              + "<span style=' color:#6E6E6E; font-weight:regular; margin: 0px; padding:0px;'>" + d["date"] + "</span>"
+              + "<hr style='margin:5px 0px -15px 0px; border:none; border-top: 1px solid #ccc;'>"
+              + "<span style='padding:0px; color:#ccc; font-weight:normal;'>Word: </span><span style='color:#FBB03B; padding:0px;'>" + word + " <br /> </span>"
+              + " <span style='color:#000; font-weight:regular;'>" + d[word].length + "</span>"
+              + "<span style='color:#6E6E6E; font-weight:regular;'> time(s) in speech <br /></span>"
+              + "<span style='color:#000; font-weight:regular;'> " + words_sum[word] + "</span>"
+              + "<span style='color:#6E6E6E; font-weight:regular;'> times across speeches" + "</span>";
+          })
+
+        svg.call(tip);
+
+        var xgap = 0; //change this variable;
+        var ygap = 0;
+
+        chart_data.forEach(function (d) {
+
+          svg.append("rect")
+            .attr("x", xgap)
+            .attr("y", ygap)
+            .attr("width", chart_dimension.width)
+            .attr("height", chart_dimension.height)
+            .attr("transform",
+              "translate(" + chart_dimension.left + "," + chart_dimension.top + ")")
+            //.attr("class", "chart")
+            .style("fill", "white");
+            svg.append("text")
+            .attr("x", xgap)
+            .attr("y", ygap - 8)
+            .attr("dy", "0")
+            .text(function (i) {
+              //console.log(d["name"]);
+              return d["date"];
+            })
+
+            .attr("font-size", "10");
+
+          svg.append("rect")
+            .attr("x", xgap)
+            .attr("y", ygap)
+            .attr("width", chart_dimension.width)
+            .attr("height", chart_length(d))
+            .attr("transform",
+              "translate(" + chart_dimension.left + "," + chart_dimension.top + ")")
+            .attr("class", "chart")
+            .style("fill", "#EFEFEF");
+
+          for (var i = 0; i < words.length; i++) {
+
+            for (var k = 0; k < d[words[i]].length; k++) {
+              svg.append("line")
+                .attr("x1", function () {
+                  return xgap;
+                }) // x position of the first end of the line
+                .attr("y1", function () {
+                  return y(d[words[i]][k], d) + ygap;
+                }) // y position of the first end of the line
+                .attr("x2", function () {
+                  return chart_dimension.width + xgap;
+                }) // x position of the second end of the line
+                .attr("y2", function () {
+                  return y(d[words[i]][k], d) + ygap;
+                })
+                .attr("class", function () {
+                  return words[i];
+                })
+                .style("stroke", function () {
+                  return words_color[i];
+                })
+                .style("opacity", 0.3)
+                .style("stroke-width", "2")
+                .style("cursor", "pointer")
+                .on("mouseover", function () {
+                  if (word_active[this.getAttribute('class')] == false) {
+                    d3.selectAll("." + this.getAttribute('class'))
+                      .transition()
+                      .duration(50)
+                      .style("stroke-width", "6")
+                      .style("opacity", 1)
+                      //.style("")
+                      ;
+                  }
+                  d3.selectAll("." + this.getAttribute('class')).moveToFront();
+                  //console.log(this.getAttribute('class'));
+                  tip.show(this.getAttribute('class'), d);
+                })
+
+                //.on('mouseover', )
+                .on("mouseout", function () {
+
+                  if (word_active[this.getAttribute('class')] == false) {
+                    d3.selectAll("." + this.getAttribute('class'))
+                      .transition()
+                      .duration(50)
+                      .style("stroke-width", "2")
+                      .style("opacity", 0.3)
+                      ;
+                  }
+
+                  tip.hide();
+                });
+
+
+            }
+          }
+
+          xgap = xgap + chart_dimension.width + 20;
+          if (xgap > width - margin.left - margin.right - 40) {
+            xgap = 0;
+            ygap = ygap + chart_dimension.height + 30;
+          }
+
+        });
+
+        d3.selection.prototype.moveToFront = function () {
+          return this.each(function () {
+            this.parentNode.appendChild(this);
+          });
+
+        };
+        ////////
+      }
+
+
+      $('.text-words').click(function () {
+        var id = $(this).attr('id');
+        if (word_active[id]) {
+          word_active[id] = false;
+          $("#" + id).css("background-color", "");
+          d3.selectAll("." + id)
+            .transition()
+            .duration(50)
+            .style("stroke-width", "2")
+            .style("opacity", 0.3)
+            ;
+
+        } else {
+          word_active[id] = true;
+          $("#" + id).css("background-color", words_color[words.indexOf(id)]);
+          d3.selectAll("." + id)
+            .transition()
+            .duration(50)
+            .style("stroke-width", "6")
+            .style("opacity", 1)
+            //.style("")
+            ;
+        }
+
+      });
+
+    }))
+
+
+  </script>
+</body>
+
+</html>

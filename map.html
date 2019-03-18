@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<html>
+
+<head>
+    <!-- Latest compiled and minified CSS-->
+
+    <!-- jQuery library-->
+    <script src="https://d3js.org/d3.v3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-geo/1.9.1/d3-geo.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.3/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.3/addons/p5.dom.js"></script>
+    <!-- Latest compiled JavaScript-->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+    <!-- jQuery library -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <!-- Latest compiled JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
+    <style>
+        body,
+        p {
+            margin: 0px;
+            padding: 0px;
+            font-family: Georgia, serif;
+            font-size: 16px;
+        }
+
+        #satellite_image {
+            width: 100%;
+            height: auto;
+        }
+
+        #nav-map {
+            background: transparent;
+            right: 100px;
+            bottom: -200px;
+            cursor: pointer;
+            position: fixed;
+            cursor: pointer;
+        }
+
+        #gujrat_map {
+            fill: white;
+            opacity: 1;
+            stroke: #C6D5CE;
+            stroke-width: 1.3;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+            visibility: visible;
+        }
+
+        .map-notes {
+            width: 400;
+            background: white;
+            opacity: 0.7;
+            margin-left: 100px;
+            padding-left: 10px;
+            padding-top: 10px;
+            padding-right: 10px;
+            padding-bottom: 10px;
+            z-index: 100;
+        }
+
+        hr {
+            margin: 0px;
+            padding: 0px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            border: none;
+            border-top: 2px solid #ccc;
+            opacity: 1;
+        }
+
+        a {
+            color: #FBB03B;
+            text-decoration: none;
+        }
+
+        img {
+            margin: 5px auto 0px auto;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="wrapper">
+            <canvas id="myCanvas">Your browser does not support canvas.</canvas>
+            <img id="satellite_image" src="satellite-image.jpg" alt="Smiley face" />
+            <div id="nav-map"> </div>
+        </div>
+    </div>
+
+    <script>
+
+        // #83C5B7
+        // #DF514D
+        // #DB403B
+        // #C6D5CE
+        // #FDF200
+        // #EA4C6F
+
+        var route_map = [];
+        var scroll;
+        var place_notes = [];
+        var place_selected = -1; // stores the number of node which is selected to display notes.
+        $(document).ready(function () {
+            var image_top = 0;
+            var image_height = 0;
+            var w = 170;
+            var h = 150;
+            var proj = d3.geo.mercator().scale(9700);
+            var path = d3.geo.path().projection(proj);
+
+            var svgContainer = d3.select("#nav-map").append("svg")
+                .attr("width", 200)
+                .attr("height", 200);
+
+            image_top = ($("#satellite_image").offset().top);
+            image_height = document.getElementById('satellite_image').offsetHeight;
+
+            var gujrat = svgContainer.append("svg:g")
+                .attr("id", "gujrat_map")
+                .call(initialize);
+
+            $.getJSON("maps.json", function (json) {
+                gujrat.selectAll("path")
+                    .data(json.features)
+                    .enter().append("path")
+                    .attr("d", path)
+                    .attr("stroke", "C6D5CE");
+            });
+
+            d3.csv("maps.csv", function (data) {
+                data.forEach(function (d) {
+                    route_map.push({
+                        x: d.x / 1200,
+                        y: d.y / 4742.44,
+                        place: d.Place,
+                        distance: d.Kilometers,
+                        halt: d.HaltType,
+                        notes: d.Notes,
+                        align: d.align
+                    });
+
+
+                    var string = '<strong>' + d.Place + '</strong> <br /> <p> <span style="font-style: italic;">' + d.day + ' / ' + d.date;
+                    if (d.HaltType) {
+                        if (d.HaltType == '1') {
+                            string = string + ' / Mid-day Halt' + '</span> </p>';
+                        } else {
+                            string = string + ' / Night Halt' + '</span> </p>'
+                        }
+                    } else {
+                        string = string + '</span> </p>';
+                    }
+                    if (d.Notes) {
+                        string = string + '<hr />' + d.Notes;
+                    }
+                    if (d.Kilometers) {
+                        string = string + '<hr />' + d.Kilometers + ' kms. from Sabarmati';
+                    }
+
+                    place_notes.push(
+                        createDiv(string)
+                    );
+
+                });
+
+                for (var i = 0; i < place_notes.length; i++) {
+                    place_notes[i].class("map-notes");
+                    place_notes[i].position(0, 0);
+                    place_notes[i].style("visibility", "hidden");
+                }
+
+            });
+
+
+            var locator = svgContainer.append("rect")
+                .attr("id", "navigation_rectangle")
+                .attr("x", 110)
+                .attr("y", 70)
+                .attr("width", 40)
+                .attr("height", 25)
+                .attr("opacity", 0)
+                .style("fill", "transparent")
+                .attr("stroke", "#FBB03B")
+                .attr("stroke-width", "3")
+                .attr("stroke-linejoin", "round");
+
+            function initialize() {
+                proj.translate([-1820, 710]);
+            }
+
+            $(window).scroll(function (event) {
+                image_top = ($("#satellite_image").offset().top);
+                image_height = document.getElementById('satellite_image').offsetHeight;
+                scroll = $(window).scrollTop();
+                if (image_height > 0) {
+                    if ((image_top - scroll < screen.height) & (image_top + image_height - scroll) > 0) {
+                        svgContainer.select("#navigation_rectangle")
+                            .attr('transform', function () {
+                                height = (image_top - scroll) * 50 / (image_height);
+                                return 'translate( 0 ' + ',' + -height + ')';
+                            });
+
+                        svgContainer.select("#navigation_rectangle")
+                            .attr("opacity", function () {
+                                if ((image_top < scroll) & (image_top + image_height - scroll) > screen.height) {
+                                    return 1;
+                                } else if (image_top - scroll < screen.height & (image_top + image_height - scroll > 1.5 * screen.height)) {
+                                    return 1 - ((image_top - scroll) / screen.height);
+                                } else if (image_top + image_height - scroll < 1.5 * screen.height) {
+                                    return ((image_top + image_height - scroll) / screen.height);
+                                } else {
+                                    return 0;
+                                }
+                            });
+
+                        $("#nav-map")
+                            .css("bottom", function () {
+                                if (screen.height + scroll - image_top < 80 + 200) {
+                                    return String(screen.height + scroll - image_top - 200 - 100) + "px";
+                                } else if (image_top + image_height - scroll < screen.height) {
+                                    return String(screen.height - (image_height + image_top - scroll + 50)) + "px";
+                                } else if (image_top - scroll < screen.height & (image_top + image_height - scroll > 1.5 * screen.height)) {
+                                    return "-5px";
+                                } else {
+                                    return "-5px";
+                                }
+
+                            });
+
+                    } else {
+
+                    }
+                } else {
+                    image_height = document.getElementById('satellite_image').offsetHeight;
+                }
+
+            });
+
+        });
+
+        // Constants
+        var Y_AXIS = 1;
+        var X_AXIS = 2;
+        var b1, b2, c1, c2;
+
+        function setup() {
+            var myCanvas = createCanvas(screen.width, document.getElementById('satellite_image').offsetHeight + $("#satellite_image").offset().top);
+            myCanvas.parent('#wrapper');
+            fill("#FBB03B");
+            strokeWeight(2);
+            smooth();
+            // Define colors
+            b1 = color(255, 0);
+            b2 = color(255);
+            c1 = color(204, 102, 0);
+            c2 = color(0, 102, 153);
+        }
+
+        function draw() {
+            clear();
+            background(255, 1);
+            area_height = document.getElementById('satellite_image').offsetHeight;
+            area_width = document.getElementById('satellite_image').offsetWidth;
+            var p1, p2, p3, p4;
+            push();
+            translate($("#satellite_image").offset().left, $("#satellite_image").offset().top);
+            for (var i = 0; i < route_map.length; i++) {
+                // Draw curve between the geolocations
+                stroke("white");
+                strokeWeight(1);
+                noFill();
+                try {
+                    p1 = {
+                        x: route_map[i].x * area_width,
+                        y: route_map[i].y * area_height
+                    }, p2 = {
+                        x: route_map[i + 1].x * area_width,
+                        y: route_map[i + 1].y * area_height
+                    }, p3 = {
+                        x: route_map[i + 2].x * area_width,
+                        y: route_map[i + 2].y * area_height
+                    }, p4 = {
+                        x: route_map[i + 3].x * area_width,
+                        y: route_map[i + 3].y * area_height
+                    };
+                    if ($("#satellite_image").offset().top + (route_map[i + 1].y * area_height) < scroll + screen.height / 2) {
+                        strokeWeight(5);
+                        curve(p1.x, p1.y, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y)
+                        if (i >= route_map.length - 6) {
+                            curve(p2.x, p2.y, p3.x, p3.y, p4.x, p4.y, p4.x, p4.y)
+                        }
+                    }
+                    strokeWeight(1);
+                    curve(p1.x, p1.y, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y)
+                    if (i == route_map.length - 4) {
+                        curve(p2.x, p2.y, p3.x, p3.y, p4.x, p4.y, p4.x, p4.y)
+                    }
+                    if (i == route_map.length - 5) {
+                        curve(p2.x, p2.y, p3.x, p3.y, p4.x, p4.y, p4.x, p4.y)
+                    }
+                } catch (err) {
+
+                }
+
+                if (i == place_selected) {
+                    stroke(255, 255);
+                    strokeWeight(2);
+                    if (route_map[i].x < 0.5) {
+                        setGradient(route_map[i].x * area_width, route_map[i].y * area_height, ((-route_map[i].x + 0.5) * area_width), 0.5, b2, b1, X_AXIS);
+                    } else {
+                        setGradient((0.5) * area_width, route_map[i].y * area_height, (route_map[i].x - 0.5) * area_width, 0.5, b1, b2, X_AXIS);
+                    }
+                } else {
+                }
+
+                strokeWeight(2);
+                fill("#FBB03B");
+                if (route_map[i].halt == '1') {
+                    stroke("white");
+                    ellipse(route_map[i].x * area_width, route_map[i].y * area_height, 15, 15); // geolocation
+                    fill("white")
+                    strokeWeight(1);
+                    noStroke();
+                    textFont("Georgia", 10, 30);
+                    textSize(16);
+                    if (i <= 14) {
+                        text(route_map[i].place, route_map[i].x * area_width + 20, route_map[i].y * area_height + 5);
+                    }
+                    else if (i == 71) {
+                        text(route_map[i].place, route_map[i].x * area_width + 20, route_map[i].y * area_height + 15);
+                    } else {
+                        text(route_map[i].place, route_map[i].x * area_width + 20, route_map[i].y * area_height + 5);
+                    }
+                } else if (route_map[i].halt == '2') {
+                    stroke("black");
+                    ellipse(route_map[i].x * area_width, route_map[i].y * area_height, 15, 15); // geolocation
+                    fill("white")
+                    strokeWeight(1);
+                    noStroke();
+                    textFont("Georgia", 10, 30);
+                    textSize(16);
+                    if (i <= 14) {
+                        text(route_map[i].place, route_map[i].x * area_width + 15, route_map[i].y * area_height + 5);
+                    }
+                    else if (i == 50) {
+                        text(route_map[i].place, route_map[i].x * area_width + 5, route_map[i].y * area_height + 5);
+                    } else {
+                        text(route_map[i].place, route_map[i].x * area_width + 20, route_map[i].y * area_height + 5);
+                    }
+                } else {
+                    fill("white")
+                    stroke("white");
+                    ellipse(route_map[i].x * area_width, route_map[i].y * area_height, 5, 5); // geolocation
+                }
+
+                if (i == place_selected) {
+                    place_notes[i].style("visibility", "visible");
+                    if (route_map[i].x < 0.5) {
+                        place_notes[i].position(area_width / 2 - $("#satellite_image").offset().left / 2, route_map[i].y * area_height - place_notes[i].size().height / 2 + $("#satellite_image").offset().top);
+                    } else {
+                        place_notes[i].position(area_width / 2 - $("#satellite_image").offset().left / 2 - place_notes[i].size().width, route_map[i].y * area_height - place_notes[i].size().height / 2 + $("#satellite_image").offset().top);
+                    }
+                } else {
+                    place_notes[i].style("visibility", "hidden");
+                }
+            }
+            pop();
+        }
+
+        function setGradient(x, y, w, h, c1, c2, axis) {
+            noFill();
+            if (axis == Y_AXIS) { // Top to bottom gradient
+                for (var i = y; i <= y + h; i++) {
+                    var inter = map(i, y, y + h, 0, 1);
+                    var c = lerpColor(c1, c2, inter);
+                    stroke(c);
+                    line(x, i, x + w, i);
+                }
+            } else if (axis == X_AXIS) { // Left to right gradient
+                for (var i = x; i <= x + w; i++) {
+                    var inter = map(i, x, x + w, 0, 1);
+                    var c = lerpColor(c1, c2, inter);
+                    stroke(c);
+                    line(i, y, i, y + h);
+                }
+            }
+        }
+
+        function mouseClicked() {
+            for (var i = 0; i < route_map.length; i++) {
+                if (dist(route_map[i].x * area_width + $("#satellite_image").offset().left, route_map[i].y * area_height + $("#satellite_image").offset().top, mouseX, mouseY) < 10) {
+                    if (place_selected == i) {
+                        place_selected = -1;
+                    } else {
+                        place_selected = i;
+                    }
+                    break;
+                }
+            }
+        }
+
+    </script>
+</body>
+
+</html>
